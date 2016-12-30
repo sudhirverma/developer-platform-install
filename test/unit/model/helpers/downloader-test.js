@@ -40,6 +40,7 @@ describe('Downloader', function() {
 
   beforeEach(function() {
     sandbox = sinon.sandbox.create();
+    downloader = new Downloader(fakeProgress, function() {}, function() {});
   });
 
   afterEach(function() {
@@ -47,12 +48,10 @@ describe('Downloader', function() {
   });
 
   it('should set totalDownloads to 1 by default', function() {
-    downloader = new Downloader(fakeProgress, function() {}, function() {});
     expect(downloader.totalDownloads).to.equal(1);
   });
 
   it('responseHandler should set the total download size', function() {
-    downloader = new Downloader(fakeProgress, function() {}, function() {});
     let response = { headers: { 'content-length': 1024 } };
 
     downloader.responseHandler(response);
@@ -61,7 +60,6 @@ describe('Downloader', function() {
   });
 
   it('dataHandler should update the progress once time threshold is reached', function() {
-    downloader = new Downloader(fakeProgress, function() {}, function() {});
     fakeProgress.totalSize = 1024;
 
     let data = { length: 512 };
@@ -75,7 +73,6 @@ describe('Downloader', function() {
   });
 
   it('dataHandler should not update the progress before time threshold is reached', function() {
-    downloader = new Downloader(fakeProgress, function() {}, function() {});
     fakeProgress.totalSize = 1024;
 
     let data = { length: 512 };
@@ -105,8 +102,6 @@ describe('Downloader', function() {
   it('endHandler should end the stream', function() {
     let stream = { end: function() {} };
     let streamSpy = sandbox.spy(stream, 'end');
-
-    downloader = new Downloader(fakeProgress, function() {}, function() {});
     downloader.setWriteStream(stream);
     downloader.endHandler(stream);
 
@@ -114,7 +109,6 @@ describe('Downloader', function() {
   });
 
   it('closeHandler should verify downloaded files checksum', function() {
-    downloader = new Downloader(fakeProgress, function() {}, function() {});
     let stub = sandbox.stub(Hash.prototype, 'SHA256').yields('hash');
 
     downloader.closeHandler('file', 'hash', 'url');
@@ -154,7 +148,6 @@ describe('Downloader', function() {
 
     it('should make a request with given options', function() {
       let requestGetSpy = sandbox.spy(request, 'get');
-      downloader = new Downloader(fakeProgress, function() {}, function() {});
       downloader.setWriteStream(new PassThrough());
       downloader.download(options3);
 
@@ -164,7 +157,6 @@ describe('Downloader', function() {
 
     it('should make a request with given url in options', function() {
       let requestGetSpy = sandbox.spy(request, 'get');
-      downloader = new Downloader(fakeProgress, function() {}, function() {});
       downloader.setWriteStream(new PassThrough());
       downloader.download(options);
 
@@ -175,7 +167,6 @@ describe('Downloader', function() {
 
     it('should make a request with \'User-Agent\' header set', function() {
       let requestGetSpy = sandbox.spy(request, 'get');
-      downloader = new Downloader(fakeProgress, function() {}, function() {});
       downloader.setWriteStream(new PassThrough());
       downloader.download(options);
 
@@ -191,7 +182,6 @@ describe('Downloader', function() {
       sandbox.stub(request, 'get').returns(response);
 
       let stream = new PassThrough();
-      downloader = new Downloader(fakeProgress, function() {}, function() {});
       downloader.setWriteStream(stream);
       let endHandler = sandbox.stub(downloader, 'endHandler');
       downloader.download(options);
@@ -207,7 +197,6 @@ describe('Downloader', function() {
       let error = new Error('something bad happened');
 
       let stream = new Writable();
-      downloader = new Downloader(fakeProgress, function() {}, function() {});
       downloader.setWriteStream(stream);
       let errorHandler = sandbox.stub(downloader, 'errorHandler');
       downloader.download(options);
@@ -222,8 +211,6 @@ describe('Downloader', function() {
       sandbox.stub(request, 'get').returns(response);
 
       let stream = new Writable();
-
-      downloader = new Downloader(fakeProgress, function() {}, function() {});
       downloader.setWriteStream(stream);
       sandbox.spy(downloader, 'success');
 
@@ -271,4 +258,46 @@ describe('Downloader', function() {
       expect(successHandler).to.be.calledOnce;
     });
   });
+
+  describe('restartDownload', function() {
+    let options = 'http://example.com/jdk.zip';
+
+    it('should change downloader status from \'Download Failed\' to \'Downloading\'', function(){
+      let spy = sandbox.spy(fakeProgress, 'setStatus');
+      downloader.restartDownload();
+      expect(spy).to.have.been.calledOnce;
+      expect(downloader.downloadSize).to.be.equal(0);
+      expect(downloader.received ).to.be.equal(0);
+      expect(downloader.currentSize).to.be.equal(0);
+      expect(fakeProgress.setStatus).to.have.been.calledOnce;
+      expect(fakeProgress.setStatus).to.have.been.calledWith('Downloading');
+    });
+
+    it('should call authDownload for entries that requires authentication', function() {
+      let response = new Readable();
+      sandbox.stub(request, 'get').returns(response);
+      response.auth = function() {return response};
+      let error = new Error('something bad happened');
+      let stream = new Writable();
+      downloader.setWriteStream(stream);
+      downloader.downloadAuth(options);
+      response.emit('error', error);
+      response.close = function() {};
+      sandbox.stub(downloader, 'downloadAuth');
+      downloader.restartDownload();
+      expect(downloader.downloadAuth).to.be.calledOnce;
+      expect(downloader.downloadAuth).to.be.calledWith(options, 'username', 'password', 'key', 'sha');
+    });
+
+    it('should call download method for entries that does not require authentication',function() {
+      let requestGetSpy = sandbox.spy(request, 'get');
+      downloader.setWriteStream(new PassThrough());
+      downloader.download(options);
+      downloader.restartDownload();
+      expect(requestGetSpy).to.be.calledOnce;
+      expect(requestGetSpy.args[0][0].url).to.be.equal(options);
+
+    });
+  });
+
 });
