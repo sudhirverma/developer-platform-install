@@ -8,6 +8,7 @@ import Downloader from 'browser/model/helpers/downloader';
 import Logger from 'browser/services/logger';
 import { Readable, PassThrough, Writable } from 'stream';
 import Hash from 'browser/model/helpers/hash';
+import fs from 'fs-extra';
 chai.use(sinonChai);
 
 describe('Downloader', function() {
@@ -262,7 +263,7 @@ describe('Downloader', function() {
   describe('restartDownload', function() {
     let options = 'http://example.com/jdk.zip';
 
-    it('should change downloader status from \'Download Failed\' to \'Downloading\'', function(){
+    it('should change downloader status from \'Download Failed\' to \'Downloading\'', function() {
       let spy = sandbox.spy(fakeProgress, 'setStatus');
       downloader.restartDownload();
       expect(spy).to.have.been.calledOnce;
@@ -276,20 +277,23 @@ describe('Downloader', function() {
     it('should call authDownload for entries that requires authentication', function() {
       let response = new Readable();
       sandbox.stub(request, 'get').returns(response);
-      response.auth = function() {return response};
+      response.auth = function() { return response; };
       let error = new Error('something bad happened');
       let stream = new Writable();
+      stream.close = function() {};
+      stream.path = 'key';
       downloader.setWriteStream(stream);
-      downloader.downloadAuth(options);
+      downloader.downloadAuth(options, 'username', 'password', 'key', 'sha');
       response.emit('error', error);
       response.close = function() {};
+      sandbox.stub(fs, 'createWriteStream');
       sandbox.stub(downloader, 'downloadAuth');
       downloader.restartDownload();
       expect(downloader.downloadAuth).to.be.calledOnce;
       expect(downloader.downloadAuth).to.be.calledWith(options, 'username', 'password', 'key', 'sha');
     });
 
-    it('should call download method for entries that does not require authentication',function() {
+    it('should call download method for entries that does not require authentication', function() {
       let requestGetSpy = sandbox.spy(request, 'get');
       downloader.setWriteStream(new PassThrough());
       downloader.download(options);
