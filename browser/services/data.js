@@ -35,11 +35,12 @@ class InstallerDataService {
     this.requirements = loadMetadata(requirements, Platform.OS);
   }
 
-  setup(vboxRoot, jdkRoot, devstudioRoot, cygwinRoot, cdkRoot) {
+  setup(vboxRoot, jdkRoot, devstudioRoot, cygwinRoot, cdkRoot, komposeRoot) {
     this.vboxRoot = vboxRoot || path.join(this.installRoot, 'virtualbox');
     this.jdkRoot = jdkRoot || path.join(this.installRoot, 'jdk8');
     this.devstudioRoot = devstudioRoot || path.join(this.installRoot, 'devstudio');
     this.cygwinRoot = cygwinRoot || path.join(this.installRoot, 'cygwin');
+    this.komposeRoot = komposeRoot || path.join(this.installRoot, 'kompose');
     this.cdkRoot = cdkRoot || path.join(this.installRoot, 'cdk');
     this.cdkBoxRoot = this.cdkRoot;
     this.ocBinRoot = path.join(this.cdkRoot, 'bin');
@@ -123,6 +124,10 @@ class InstallerDataService {
 
   cygwinDir() {
     return this.cygwinRoot;
+  }
+
+  komposeDir() {
+    return this.komposeRoot;
   }
 
   cdkDir() {
